@@ -115,7 +115,12 @@ EventSchema.pre('save', function (next) {
 
     // Generate slug only if title changed or document is new
     if (event.isModified('title') || event.isNew) {
-        event.slug = generateSlug(event.title);
+        const slug = generateSlug(event.title);
+        // Reject titles whose slugs are empty (e.g. "???") — the document must never persist without a valid slug
+        if (!slug) {
+            return next(new Error('Title must contain at least one alphanumeric character to produce a valid slug'));
+        }
+        event.slug = slug;
     }
 
     // Normalize date to ISO format if it's not already
@@ -144,11 +149,34 @@ function generateSlug(title: string): string {
 
 // Helper function to normalize date to ISO format
 function normalizeDate(dateString: string): string {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-        throw new Error('Invalid date format');
+    // Require strict YYYY-MM-DD input — reject freeform strings, partial dates, and ambiguous formats
+    const match = dateString.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+        throw new Error('Date must be in YYYY-MM-DD format');
     }
-    return date.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10); // 1-based
+    const day = parseInt(match[3], 10);
+
+    // setUTCFullYear avoids the 0–99 → 1900–1999 remapping that the Date constructor applies
+    const parsed = new Date(0);
+    parsed.setUTCFullYear(year, month - 1, day);
+
+    // If the date rolled over (e.g. Feb 30 → Mar 2) the parsed components won't match the input
+    if (
+        parsed.getUTCFullYear() !== year ||
+        parsed.getUTCMonth() + 1 !== month ||
+        parsed.getUTCDate() !== day
+    ) {
+        throw new Error(`Invalid calendar date: ${dateString}`);
+    }
+
+    return [
+        String(year).padStart(4, '0'),
+        String(month).padStart(2, '0'),
+        String(day).padStart(2, '0'),
+    ].join('-');
 }
 
 // Helper function to normalize time format
