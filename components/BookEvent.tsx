@@ -49,3 +49,4 @@ const BookEvent = ({ eventId, slug} : { eventId : string, slug : string}) => {
     )
 }
 export default BookEvent
+
