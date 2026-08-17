@@ -1,4 +1,5 @@
 import { Schema, model, models, Document } from 'mongoose';
+import connectDB from '@/lib/mongodb'
 
 // TypeScript interface for Event document
 export interface IEvent extends Document {
